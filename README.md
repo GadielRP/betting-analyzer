@@ -1,30 +1,60 @@
 # Betting Data Analyzer
 
-A desktop application that analyzes betting data from images using OCR and custom betting logic.
+An automated tool for analyzing betting data using OCR and custom logic.
+
+## Project Structure
+```
+betting-analyzer/
+├── src/              # Source code
+├── tests/            # Test files
+├── docs/             # Documentation
+├── config/           # Configuration files
+└── requirements.txt  # Python dependencies
+```
 
 ## Features
-- Image upload and processing
-- OCR text extraction
-- Betting data analysis
-- Custom logic processing
+- Automated screenshot capture of betting sites
+- OCR processing using Google Cloud Vision
+- Custom betting logic implementation
+- Data analysis and visualization
 
 ## Setup
-1. Install Python dependencies:
+1. Clone the repository
+```bash
+git clone https://github.com/YOUR_USERNAME/betting-analyzer.git
+cd betting-analyzer
+```
+
+2. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Install Tesseract OCR (for development):
-- Windows: Download from https://github.com/UB-Mannheim/tesseract/wiki
-- Add Tesseract to system PATH
+## Development
+This project follows Git Flow workflow:
+- `main`: Production-ready code
+- `develop`: Development integration branch
+- `feature/*`: Feature branches
+- `release/*`: Release preparation
+- `hotfix/*`: Emergency fixes
 
-## Usage
-Run the application:
+### Creating a New Feature
 ```bash
-python main.py
+git checkout develop
+git checkout -b feature/your-feature-name
 ```
 
-## Project Structure
-- `main.py`: Main application GUI
-- `logic.py`: Betting analysis logic
-- `ace_tools.py`: Utility functions 
+### Submitting Changes
+1. Commit your changes
+2. Push to your feature branch
+3. Create a Pull Request to develop
+
+## License
+[Your chosen license]
+
+## Contributing
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to your branch
+5. Create a Pull Request 
