@@ -22,14 +22,26 @@ wheels/
 
 # Virtual Environment
 venv/
-env/
 ENV/
+env/
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+
+# Uploads and Results
+uploads/*
+!uploads/.gitkeep
+
+# Environment Variables
+.env
+.env.*
+
+# Google Cloud credentials
+*credentials*.json
+*token*.json
 
 # OS
 .DS_Store

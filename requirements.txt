@@ -1,4 +1,23 @@
-numpy>=1.26.0
-pandas>=2.1.0
-Pillow>=10.0.0
-pytesseract>=0.3.10 
+# Core dependencies
+pandas==2.2.0
+Pillow==10.2.0
+pytesseract==0.3.10
+
+# Web automation
+selenium==4.18.1
+webdriver-manager==4.0.1
+
+# OCR and Cloud Vision
+google-cloud-vision==3.4.4
+
+# Utility packages
+python-dotenv==1.0.0
+requests==2.31.0
+numpy==1.26.4
+
+# Added from the code block
+flask==2.3.3
+Werkzeug==2.3.7
+gunicorn==21.2.0
+pillow==10.0.0
+python-magic==0.4.27 
