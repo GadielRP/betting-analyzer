@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 import os
 import json
 from datetime import datetime
-from src.selenium.screenshot_manager import ScreenshotManager
 from src.ocr.vision_client import VisionClient
 
 # Load environment variables
@@ -20,7 +19,6 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Initialize clients
 vision_client = VisionClient()
-screenshot_manager = ScreenshotManager()
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
