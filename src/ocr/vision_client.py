@@ -2,10 +2,15 @@ import os
 from google.cloud import vision
 from google.cloud.vision_v1 import types
 from typing import List, Dict, Any
+from src.config.ocr_config import GOOGLE_CLOUD_CREDENTIALS, OCR_SETTINGS
 
 class VisionClient:
     def __init__(self):
-        """Initialize the Google Cloud Vision client."""
+        """Initialize the Vision API client."""
+        if not os.path.exists(GOOGLE_CLOUD_CREDENTIALS):
+            raise FileNotFoundError(f"Google Cloud credentials file not found at {GOOGLE_CLOUD_CREDENTIALS}")
+        
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GOOGLE_CLOUD_CREDENTIALS
         self.client = vision.ImageAnnotatorClient()
 
     def detect_text(self, image_path: str) -> Dict[str, Any]:
@@ -18,6 +23,14 @@ class VisionClient:
         Returns:
             Dict[str, Any]: Dictionary containing detected text and confidence scores
         """
+        # Verify file exists and is within size limit
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"Image file not found: {image_path}")
+            
+        file_size = os.path.getsize(image_path)
+        if file_size > OCR_SETTINGS["max_image_size"]:
+            raise ValueError(f"Image size ({file_size} bytes) exceeds maximum allowed size ({OCR_SETTINGS['max_image_size']} bytes)")
+            
         try:
             # Read the image file
             with open(image_path, 'rb') as image_file:
@@ -27,42 +40,33 @@ class VisionClient:
             image = types.Image(content=content)
 
             # Perform text detection
-            response = self.client.text_detection(image=image)
-            texts = response.text_annotations
+            response = self.client.text_detection(
+                image=image,
+                image_context={"language_hints": [OCR_SETTINGS["language"]]}
+            )
 
             if response.error.message:
                 raise Exception(
-                    '{}\nFor more info on error messages, check: '
-                    'https://cloud.google.com/apis/design/errors'.format(
-                        response.error.message))
+                    f"Error detecting text: {response.error.message}"
+                )
 
-            # Process the results
-            if texts:
-                full_text = texts[0].description
-                detected_texts = []
-                
-                # Get individual text blocks with their locations
-                for text in texts[1:]:
-                    detected_texts.append({
-                        'text': text.description,
-                        'confidence': text.confidence,
-                        'bounding_box': [
-                            (vertex.x, vertex.y)
-                            for vertex in text.bounding_poly.vertices
-                        ]
-                    })
+            # Extract text annotations
+            result = {
+                "full_text": response.text_annotations[0].description if response.text_annotations else "",
+                "text_blocks": []
+            }
+            
+            # Process individual text blocks
+            for text in response.text_annotations[1:]:  # Skip the first one as it contains all text
+                vertices = [(vertex.x, vertex.y) for vertex in text.bounding_poly.vertices]
+                result["text_blocks"].append({
+                    "text": text.description,
+                    "confidence": text.confidence if hasattr(text, "confidence") else None,
+                    "bounds": vertices,
+                    "locale": text.locale if hasattr(text, "locale") else None
+                })
 
-                return {
-                    'full_text': full_text,
-                    'text_blocks': detected_texts,
-                    'language': response.text_annotations[0].locale if response.text_annotations[0].locale else 'en'
-                }
-            else:
-                return {
-                    'full_text': '',
-                    'text_blocks': [],
-                    'language': 'en'
-                }
+            return result
 
         except Exception as e:
             raise Exception(f"Error processing image: {str(e)}")
