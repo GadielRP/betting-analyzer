@@ -95,3 +95,54 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Google Cloud Vision API
 - Flask
 - TailwindCSS 
+
+# Betting App OCR Integration
+
+This project integrates Google Cloud Vision API for OCR (Optical Character Recognition) functionality to process betting site screenshots.
+
+## Setup
+
+1. Install the required dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. Set up Google Cloud Vision API:
+   - Create a Google Cloud project
+   - Enable the Cloud Vision API
+   - Create a service account and download the credentials JSON file
+   - Place the credentials file in the `credentials` directory as `google_cloud_credentials.json`
+   - Alternatively, set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable to point to your credentials file
+
+3. Configure the OCR settings in `src/config/ocr_config.py` if needed.
+
+## Usage
+
+The OCR functionality can be used through the `OCRClient` class:
+
+```python
+from src.ocr.ocr_client import OCRClient
+
+# Initialize the OCR client
+ocr_client = OCRClient()
+
+# Process an image
+result = ocr_client.process_image("path/to/image.jpg")
+print(result)
+```
+
+## Output
+
+OCR results are saved in the `data/ocr_results` directory as JSON files. Each result includes:
+- Detected text
+- Confidence level
+- Language
+- Image path
+
+## Troubleshooting
+
+If you encounter issues:
+1. Verify your Google Cloud credentials are correctly set up
+2. Check that the image format is supported (jpg, jpeg, png, bmp, gif)
+3. Ensure the image size is within the limit (10MB)
+4. Check the logs for any error messages 

@@ -1,0 +1,3 @@
+"""
+ocr package initialization
+""" 

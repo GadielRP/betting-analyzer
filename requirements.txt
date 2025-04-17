@@ -1,11 +1,11 @@
 # Core dependencies
 pandas==2.2.0
-Pillow==10.2.0
+Pillow==10.0.0
 pytesseract==0.3.10
 
 # Web automation
-selenium==4.18.1
-webdriver-manager==4.0.1
+selenium==4.15.2
+webdriver-manager==3.8.6
 
 # OCR and Cloud Vision
 google-cloud-vision==3.4.4

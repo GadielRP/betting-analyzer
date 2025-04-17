@@ -1,10 +1,11 @@
 from flask import Flask, request, render_template, jsonify
-from google.cloud import vision
-import os
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
+import os
 import json
 from datetime import datetime
+from src.selenium.screenshot_manager import ScreenshotManager
+from src.ocr.vision_client import VisionClient
 
 # Load environment variables
 load_dotenv()
@@ -17,39 +18,20 @@ app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg'}
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+# Initialize clients
+vision_client = VisionClient()
+screenshot_manager = ScreenshotManager()
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
-def process_image_with_vision(image_path):
+def process_image(image_path):
     """Process an image using Google Cloud Vision API"""
-    client = vision.ImageAnnotatorClient()
-
-    with open(image_path, 'rb') as image_file:
-        content = image_file.read()
-
-    image = vision.Image(content=content)
-    response = client.text_detection(image=image)
-    texts = response.text_annotations
-
-    if texts:
-        # Get the full text
-        full_text = texts[0].description
-        
-        # Get individual words with their bounding boxes
-        words_with_bounds = []
-        for text in texts[1:]:  # Skip the first one as it contains all text
-            vertices = [(vertex.x, vertex.y) for vertex in text.bounding_poly.vertices]
-            words_with_bounds.append({
-                'text': text.description,
-                'bounds': vertices
-            })
-        
-        return {
-            'full_text': full_text,
-            'words': words_with_bounds
-        }
-    
-    return {'error': 'No text found in image'}
+    try:
+        result = vision_client.detect_text(image_path)
+        return result
+    except Exception as e:
+        return {'error': str(e)}
 
 @app.route('/')
 def home():
@@ -74,14 +56,14 @@ def upload_file():
         file.save(filepath)
         
         try:
-            # Process with Google Cloud Vision
-            result = process_image_with_vision(filepath)
+            # Process with Vision API
+            result = process_image(filepath)
             
             # Save results to JSON
             result_filename = f"{filename}_results.json"
             result_filepath = os.path.join(app.config['UPLOAD_FOLDER'], result_filename)
-            with open(result_filepath, 'w') as f:
-                json.dump(result, f, indent=2)
+            with open(result_filepath, 'w', encoding='utf-8') as f:
+                json.dump(result, f, indent=2, ensure_ascii=False)
             
             return jsonify({
                 'success': True,
