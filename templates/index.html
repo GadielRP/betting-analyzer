@@ -5,12 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sports OCR Processor</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .table-container {
+            width: 100%;
+            margin-top: 1rem;
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow-x: auto;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .data-table th {
+            background-color: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #374151;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .data-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .data-table tr:hover {
+            background-color: #f9fafb;
+        }
+    </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
     <div class="container mx-auto px-4 py-8">
         <h1 class="text-3xl font-bold text-center mb-8">Sports OCR Processor</h1>
         
-        <div class="max-w-xl mx-auto bg-white rounded-lg shadow-md p-6">
+        <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-6">
             <!-- Upload Zone -->
             <div id="upload-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-4">
                 <form id="uploadForm" class="space-y-4">
@@ -23,7 +53,7 @@
                             Upload a file
                         </button>
                     </div>
-                    <input type="file" id="fileInput" class="hidden" accept=".png,.jpg,.jpeg" required>
+                    <input type="file" id="fileInput" class="hidden" accept="image/*" required>
                 </form>
             </div>
 
@@ -36,9 +66,7 @@
                         </svg>
                         <span id="fileName" class="text-sm font-medium text-gray-900"></span>
                     </div>
-                    <button onclick="clearFile()" class="text-sm text-red-500 hover:text-red-700">
-                        Remove
-                    </button>
+                    <button onclick="clearFile()" class="text-sm text-red-500 hover:text-red-700">Remove</button>
                 </div>
                 <div class="relative">
                     <img id="imagePreview" class="max-h-64 mx-auto rounded-lg shadow-sm" />
@@ -49,7 +77,7 @@
             </div>
 
             <!-- Loading Indicator -->
-            <div id="loading" class="hidden text-center">
+            <div id="loading" class="hidden text-center py-4">
                 <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
                 <p class="mt-2 text-gray-600">Processing image...</p>
             </div>
@@ -60,18 +88,28 @@
             <!-- Results Section -->
             <div id="results" class="hidden space-y-6">
                 <div>
-                    <h2 class="text-xl font-semibold mb-4">Full Text</h2>
-                    <div id="fullText" class="bg-gray-50 p-4 rounded-lg"></div>
+                    <h2 class="text-xl font-semibold mb-4">Detected Table</h2>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead id="tableHeader"></thead>
+                            <tbody id="tableBody"></tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <div>
-                    <h2 class="text-xl font-semibold mb-4">Text Blocks</h2>
-                    <div id="textBlocks" class="space-y-4"></div>
+                    <h2 class="text-xl font-semibold mb-4">Raw Text</h2>
+                    <div id="rawText" class="bg-gray-50 p-4 rounded-lg whitespace-pre-wrap"></div>
                 </div>
 
-                <button onclick="copyToClipboard()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 w-full">
-                    Copy Full Text
-                </button>
+                <div class="flex gap-4">
+                    <button onclick="downloadCSV()" class="flex-1 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                        Download as CSV
+                    </button>
+                    <button onclick="copyToClipboard()" class="flex-1 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        Copy Raw Text
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -88,17 +126,12 @@
         const error = document.getElementById('error');
 
         function showFilePreview(file) {
-            // Display file name
             fileName.textContent = file.name;
-            
-            // Create image preview
             const reader = new FileReader();
             reader.onload = function(e) {
                 imagePreview.src = e.target.result;
             };
             reader.readAsDataURL(file);
-            
-            // Show preview section
             filePreview.classList.remove('hidden');
             uploadZone.classList.add('hidden');
         }
@@ -158,28 +191,49 @@
                 });
                 
                 const data = await response.json();
+                console.log('Response data:', data); // Debug log
                 
                 if (data.error) {
                     throw new Error(data.error);
                 }
                 
                 // Display results
-                document.getElementById('fullText').textContent = data.result.full_text;
+                const tableHeader = document.getElementById('tableHeader');
+                const tableBody = document.getElementById('tableBody');
+                const rawText = document.getElementById('rawText');
                 
-                const textBlocksContainer = document.getElementById('textBlocks');
-                textBlocksContainer.innerHTML = '';
+                // Clear previous content
+                tableHeader.innerHTML = '';
+                tableBody.innerHTML = '';
                 
-                data.result.text_blocks.forEach(block => {
-                    const div = document.createElement('div');
-                    div.className = 'bg-white shadow rounded p-4';
-                    div.innerHTML = `
-                        <p class="font-medium">Text: <span class="font-normal">${block.text}</span></p>
-                        ${block.confidence ? `<p class="text-sm text-gray-600">Confidence: ${(block.confidence * 100).toFixed(2)}%</p>` : ''}
-                        ${block.locale ? `<p class="text-sm text-gray-600">Language: ${block.locale}</p>` : ''}
-                    `;
-                    textBlocksContainer.appendChild(div);
-                });
+                if (data.success && data.table && data.table.headers && data.table.df) {
+                    console.log('Table data:', data.table); // Debug log
+                    
+                    // Create header row
+                    const headerRow = document.createElement('tr');
+                    data.table.headers.forEach(header => {
+                        const th = document.createElement('th');
+                        th.textContent = header;
+                        headerRow.appendChild(th);
+                    });
+                    tableHeader.appendChild(headerRow);
+                    
+                    // Create data rows
+                    data.table.df.forEach(row => {
+                        const tr = document.createElement('tr');
+                        data.table.headers.forEach(header => {
+                            const td = document.createElement('td');
+                            td.textContent = row[header] || '';
+                            tr.appendChild(td);
+                        });
+                        tableBody.appendChild(tr);
+                    });
+                }
                 
+                // Display raw text
+                rawText.textContent = data.raw_text || '';
+                
+                // Show results section
                 results.classList.remove('hidden');
                 
             } catch (err) {
@@ -193,7 +247,7 @@
         });
 
         function copyToClipboard() {
-            const text = document.getElementById('fullText').textContent;
+            const text = document.getElementById('rawText').textContent;
             navigator.clipboard.writeText(text)
                 .then(() => {
                     const btn = event.target;
@@ -204,6 +258,39 @@
                     }, 2000);
                 })
                 .catch(err => console.error('Failed to copy text:', err));
+        }
+
+        function downloadCSV() {
+            const table = document.querySelector('.data-table');
+            let csv = [];
+            
+            // Get headers
+            const headers = [];
+            table.querySelectorAll('thead th').forEach(th => {
+                headers.push('"' + th.textContent.replace(/"/g, '""') + '"');
+            });
+            csv.push(headers.join(','));
+            
+            // Get data rows
+            table.querySelectorAll('tbody tr').forEach(tr => {
+                const row = [];
+                tr.querySelectorAll('td').forEach(td => {
+                    row.push('"' + td.textContent.replace(/"/g, '""') + '"');
+                });
+                csv.push(row.join(','));
+            });
+            
+            // Download CSV file
+            const csvContent = csv.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'table_data.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
     </script>
 </body>
