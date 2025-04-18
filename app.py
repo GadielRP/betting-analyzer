@@ -60,43 +60,48 @@ def home():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
-    
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
-    
-    if file and allowed_file(file.filename):
-        # Create unique filename
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{timestamp}_{secure_filename(file.filename)}"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    try:
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'No file provided'})
         
-        # Save the file
-        file.save(filepath)
-        logger.info(f"Saved file to: {filepath}")
+        file = request.files['file']
+        tab = request.form.get('tab', 'overunder')  # Get the current tab, default to overunder
         
-        try:
-            # Process with Vision API
-            result = process_image(filepath)
-            
-            # Save results to JSON
-            result_filename = f"{filename}_results.json"
-            result_filepath = os.path.join(app.config['UPLOAD_FOLDER'], result_filename)
-            with open(result_filepath, 'w', encoding='utf-8') as f:
-                json.dump(result, f, indent=2, ensure_ascii=False)
-            
-            logger.info(f"Saved results to: {result_filepath}")
-            
-            # Return the result directly without extra nesting
-            return jsonify(result)
-            
-        except Exception as e:
-            logger.error(f"Error in upload_file: {str(e)}", exc_info=True)
-            return jsonify({'error': str(e)}), 500
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No file selected'})
         
-    return jsonify({'error': 'Invalid file type'}), 400
+        if file:
+            # Save the file
+            filename = secure_filename(file.filename)
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"{timestamp}_{filename}"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            
+            try:
+                # Process the image based on the selected tab
+                if tab == 'overunder':
+                    result = process_image(filepath)  # Current OCR processing for over/under
+                else:
+                    # For now, other tabs will use the same processing
+                    # We'll implement specific processing for each tab later
+                    result = process_image(filepath)
+                
+                return jsonify({
+                    'success': True,
+                    'table': result['table'],
+                    'raw_text': result.get('raw_text', '')
+                })
+                
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
+            finally:
+                # Clean up the uploaded file
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
     app.run(debug=True) 

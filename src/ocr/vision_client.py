@@ -274,130 +274,90 @@ class VisionClient:
     def convert_rows_to_table(self, rows):
         """
         Convert rows of words into a structured table format.
+        
+        Args:
+            rows: List of rows, where each row is a list of word dictionaries
+            
+        Returns:
+            Dict containing table headers and data frame
         """
-        try:
-            if not rows:
-                return {'headers': [], 'df': []}
+        headers = ['Position', 'Team', 'MP', 'O', 'U', 'G', 'G/M']  # Removed 'Last 5'
+        df = []
+        
+        # Skip navigation elements at the top
+        start_idx = 0
+        for i, row in enumerate(rows):
+            row_text = ' '.join(word['text'] for word in row)
+            if 'TEAM' in row_text and 'MP' in row_text:  # Found the header row
+                start_idx = i + 1
+                break
+        
+        # Process data rows
+        for row in rows[start_idx:]:
+            # Sort words by x_center to maintain left-to-right order
+            sorted_words = sorted(row, key=lambda x: x['x_center'])
             
-            # Define expected columns
-            headers = ['Date', 'Team1', 'Score', 'Result', 'Team2', 'Spread', 'OU_Type', 'Total']
-            data = []
+            # Skip rows that don't match our expected pattern
+            if not sorted_words or len(sorted_words) < 4:
+                continue
+                
+            row_data = [''] * len(headers)
             
-            # Skip header row by checking for header-like content
-            header_keywords = {'GAME', 'RESULT', 'ATS', 'O/U'}
-            
-            for row in rows:
-                # Skip rows that contain header keywords
-                row_texts = {word['text'].upper() for word in row}
-                if any(keyword in row_texts for keyword in header_keywords):
-                    continue
+            # Extract position (remove the dot if present)
+            first_word = sorted_words[0]['text'].replace('.', '')
+            if first_word.isdigit():
+                row_data[0] = int(first_word)
                 
-                row_data = {header: '' for header in headers}
-                spread_found = False
-                ou_found = False
-                total_found = False
-                
-                # Sort words by x position for consistent processing
-                sorted_words = sorted(row, key=lambda x: x['x_center'])
-                
-                # First pass: Look for specific patterns
-                for i, word in enumerate(sorted_words):
-                    text = word['text'].strip()
-                    text_clean = text.strip('()@ ')
-                    text_upper = text_clean.upper()
-                    x_coord = word['x_center']
-                    
-                    # Date (contains '/')
-                    if '/' in text:
-                        row_data['Date'] = text
-                        continue
-                    
-                    # Teams
-                    if text_clean in ['MIN', 'DET']:
-                        if not row_data['Team1']:
-                            row_data['Team1'] = text_clean
-                        elif not row_data['Team2']:
-                            row_data['Team2'] = text_clean
-                        continue
-                    
-                    # Score (contains '-')
-                    if '-' in text and text.replace('-', '').isdigit():
-                        row_data['Score'] = text
-                        continue
-                    
-                    # Spread (contains .5 and +/-)
-                    if not spread_found and '.5' in text and ('+' in text or '-' in text):
-                        row_data['Spread'] = text_clean
-                        spread_found = True
-                        
-                        # Check if this spread contains team info
-                        if 'DET' in text or 'MIN' in text:
-                            team = 'DET' if 'DET' in text else 'MIN'
-                            if not row_data['Team2']:
-                                row_data['Team2'] = team
-                        continue
-                    
-                    # O/U Type and Total
-                    if not ou_found:
-                        # Check for O/U indicators in various formats
-                        if text_upper in ['O', 'U', '0', 'O)', 'U)', '(O', '(U', '(O)', '(U)']:
-                            # Clean up the O/U indicator
-                            clean_ou = text_upper.strip('() ')
-                            row_data['OU_Type'] = 'O' if clean_ou in ['O', '0', 'O)', '(O', '(O)'] else 'U'
-                            ou_found = True
-                            
-                            # Look ahead for the total value
-                            if i + 1 < len(sorted_words):
-                                next_text = sorted_words[i + 1]['text'].strip('() ')
-                                if '.5' in next_text:
-                                    row_data['Total'] = next_text
-                                    total_found = True
-                                elif next_text.isdigit():  # Handle whole numbers
-                                    row_data['Total'] = next_text
-                                    total_found = True
-                            continue
-                    
-                    # Catch any remaining total values
-                    if not total_found:
-                        # Check for standalone numbers or decimals
-                        if text_clean.isdigit() or '.5' in text_clean:
-                            if not ('+' in text or '-' in text):  # Make sure it's not a spread
-                                row_data['Total'] = text_clean
-                                total_found = True
-                                continue
-                
-                # Clean up data
-                row_data = {k: v.strip('() ') for k, v in row_data.items()}
-                
-                # Second pass: Try to find missing Team2 if we have other data
-                if not row_data['Team2'] and row_data['Team1'] and row_data['Score']:
-                    # Look for team in spread text
-                    for word in sorted_words:
-                        text = word['text']
-                        if 'DET' in text or 'MIN' in text:
-                            team = 'DET' if 'DET' in text else 'MIN'
-                            if team != row_data['Team1']:
-                                row_data['Team2'] = team
-                                break
-                
-                # Simple Result detection: Look for 'W', otherwise set as 'L'
-                found_w = False
-                for word in sorted_words:
-                    text = word['text'].upper().strip('() ')
-                    if 'W' in text:
-                        found_w = True
+                # Extract team name (usually the second word/group)
+                team_words = []
+                current_x = 0
+                for word in sorted_words[1:]:
+                    if word['x_center'] < 200:  # Team names are typically on the left
+                        team_words.append(word['text'])
+                    else:
                         break
-                row_data['Result'] = 'W' if found_w else 'L'
+                # Clean up team name by removing leading ". " if present
+                team_name = ' '.join(team_words).strip()
+                if team_name.startswith('. '):
+                    team_name = team_name[2:]
+                row_data[1] = team_name
                 
-                # Only add rows that have some meaningful data (at least date and team1)
-                if row_data['Date'] and row_data['Team1']:
-                    data.append(row_data)
-            
-            return {'headers': headers, 'df': data}
-            
-        except Exception as e:
-            logger.error(f"Error in convert_rows_to_table: {str(e)}", exc_info=True)
-            raise
+                # Process remaining columns
+                for word in sorted_words:
+                    x = word['x_center']
+                    text = word['text'].strip()
+                    
+                    # MP column (usually around x=350)
+                    if 330 < x < 370 and text.isdigit():
+                        row_data[2] = int(text)
+                    
+                    # O column (around x=380-400)
+                    elif 370 < x < 400 and text.isdigit():
+                        row_data[3] = int(text)
+                    
+                    # U column (around x=410-430)
+                    elif 400 < x < 430 and text.isdigit():
+                        row_data[4] = int(text)
+                    
+                    # G column (Goals, format like "84:29")
+                    elif 430 < x < 480 and ':' in text:
+                        row_data[5] = text
+                    
+                    # G/M column (usually a float value)
+                    elif 480 < x < 520:
+                        try:
+                            row_data[6] = float(text)
+                        except ValueError:
+                            pass
+                
+                # Only add rows that have at least position and team
+                if row_data[0] and row_data[1]:
+                    df.append(row_data)
+        
+        return {
+            'headers': headers,
+            'df': sorted(df, key=lambda x: x[0]) if df else []  # Sort by position
+        }
 
     def set_y_threshold(self, threshold: float):
         """Set the Y-coordinate threshold for grouping words into rows."""
